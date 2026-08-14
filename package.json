@@ -30,6 +30,14 @@
   ],
   "author": "chinng_inta",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/chinng-inta/dsh-web-search-searxng.git"
+  },
+  "bugs": {
+    "url": "https://github.com/chinng-inta/dsh-web-search-searxng/issues"
+  },
+  "homepage": "https://github.com/chinng-inta/dsh-web-search-searxng#readme",
   "publishConfig": {
     "access": "public"
   },
