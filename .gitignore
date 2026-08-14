@@ -1,0 +1,5 @@
+node_modules/
+lib/
+*.tgz
+# npm publish 時にトークンが書き込まれる事故を防ぐ
+.npmrc

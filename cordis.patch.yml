@@ -1,0 +1,35 @@
+# Bundle layer for dsh-web-search-searxng.
+#
+# `dsh plugin add dsh-web-search-searxng` appends this package to the profile's
+# bundle list, and this patch is applied in that order — BEFORE the profile's own
+# cordis.patch.yml, the home patch, and any --patch overlay. Every value here is
+# therefore overridable by a later layer.
+#
+# The provider row deliberately carries no config: `apply()` falls back to
+# $SEARXNG_URL when `baseURL` is omitted, so the common case needs no
+# configuration at all.
+- insert:
+    - id: web-search-searxng
+      name: 'dsh-web-search-searxng'
+
+# Selecting this provider is NOT optional politeness — without it, installing
+# this package breaks search outright.
+#
+# The seam auto-selects only when exactly ONE registered provider is usable, and
+# `@deepseek-ai/dsh-web-search-deepseek` reports usable whenever a credential
+# RESOLVER exists, which its own `apply()` always supplies:
+#
+#   available() { return (apiKey?.length > 0 || resolveApiKey !== undefined) && ... }
+#
+# So on a stock composition it answers true even with no key configured. Adding a
+# second usable provider without naming one would make every search fail with
+# WEB_PROVIDER_AMBIGUOUS.
+#
+# A patch replaces the targeted row's whole `config`, so this restates every key
+# it owns — `searchProvider` is the only one it sets. If YOU also patch the `web`
+# row in a later layer (to pick a `fetchProvider`, say), that layer replaces this
+# config wholesale: restate `searchProvider: searxng` there, or search falls back
+# to the base layer's `deepseek-official`.
+- id: web
+  config:
+    searchProvider: searxng
