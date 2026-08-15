@@ -15,11 +15,34 @@ own instance.
 
 ## Install
 
+### From npm
+
 ```bash
 dsh plugin --profile web add dsh-web-search-searxng
 ```
 
-The package declares `dsh.bundle`, so this single command also activates it: the bundle patch
+### From this repository
+
+```bash
+dsh plugin --profile web add github:chinng-inta/dsh-web-search-searxng
+```
+
+A git dependency ships no `lib/`, so the package builds itself through its `prepare` script — and
+pnpm blocks install scripts until you allow them. The first run therefore fails and prints the exact
+key to allow. Add it to your profile's `pnpm-workspace.yaml` and re-run:
+
+```yaml
+allowBuilds:
+  "dsh-web-search-searxng@https://codeload.github.com/chinng-inta/dsh-web-search-searxng/tar.gz/<commit-sha>": true
+```
+
+The key pins a commit, so it changes whenever you install a newer revision. Building from source also
+needs the dev toolchain fetched (~20 s versus ~2 s for the registry). Prefer npm unless you are
+tracking unreleased changes.
+
+### Either way
+
+The package declares `dsh.bundle`, so a single command also activates it: the bundle patch
 inserts the provider row and selects it on the `web` row. Point it at your instance and restart:
 
 ```bash
@@ -179,6 +202,7 @@ search, and following one would send the query to a host the deployment never co
 
 | This package | DeepSeek Harness |
 |---|---|
+| `0.3.2`+ | `0.1.0-rc.6` — installable straight from git (`prepare` builds on install) |
 | `0.3.x` | `0.1.0-rc.6` |
 | `0.2.x` | `0.1.0-rc.6` |
 | `0.1.x` | `0.1.0-rc.6` |
