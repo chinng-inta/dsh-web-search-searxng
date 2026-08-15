@@ -144,23 +144,29 @@ export function mapSearxngResponse(
   }
 }
 
-/** The SearXNG-backed search provider. Redirects are refused as `WEB_PROVIDER_ERROR`. */
+/**
+ * The SearXNG-backed search provider. Redirects are refused as `WEB_PROVIDER_ERROR`.
+ *
+ * Options arrive as a THUNK, not a captured object: the settings section is
+ * projected per operation so a user-layer edit reaches the NEXT search without
+ * a restart, and the seam's provider selection never flickers on a config
+ * change (the registration itself is stable — only the values it reads move).
+ */
 export class SearxngSearchProvider implements WebSearchProvider {
   readonly id = SEARXNG_PROVIDER_ID
 
-  private readonly endpoint: URL | undefined
-
-  constructor(private readonly options: SearxngSearchProviderOptions) {
-    this.endpoint = parseBaseURL(options.baseURL)
-  }
+  constructor(private readonly options: () => SearxngSearchProviderOptions) {}
 
   /** Cheap local check: a parseable http(s) base URL. Never touches the network. */
   available(): boolean {
-    return this.endpoint !== undefined
+    return parseBaseURL(this.options().baseURL) !== undefined
   }
 
   async search(request: WebSearchRequest, signal?: AbortSignal): Promise<WebSearchResult> {
-    const endpoint = this.endpoint
+    // One projection per search: every value below comes from the same snapshot,
+    // so a concurrent settings commit cannot split one request across two configs.
+    const options = this.options()
+    const endpoint = parseBaseURL(options.baseURL)
     // Defensive: the seam consults available() before selecting, so reaching
     // here without an endpoint means a caller bypassed selection.
     if (endpoint === undefined) {
@@ -173,21 +179,21 @@ export class SearxngSearchProvider implements WebSearchProvider {
     const url = new URL('search', endpoint.href.endsWith('/') ? endpoint.href : `${endpoint.href}/`)
     url.searchParams.set('q', request.query)
     url.searchParams.set('format', 'json')
-    if (this.options.categories?.length) {
-      url.searchParams.set('categories', this.options.categories.join(','))
+    if (options.categories?.length) {
+      url.searchParams.set('categories', options.categories.join(','))
     }
-    if (this.options.engines?.length) {
-      url.searchParams.set('engines', this.options.engines.join(','))
+    if (options.engines?.length) {
+      url.searchParams.set('engines', options.engines.join(','))
     }
-    if (this.options.language !== undefined) url.searchParams.set('language', this.options.language)
-    if (this.options.timeRange !== undefined) {
-      url.searchParams.set('time_range', this.options.timeRange)
+    if (options.language !== undefined) url.searchParams.set('language', options.language)
+    if (options.timeRange !== undefined) {
+      url.searchParams.set('time_range', options.timeRange)
     }
-    if (this.options.safesearch !== undefined) {
-      url.searchParams.set('safesearch', String(this.options.safesearch))
+    if (options.safesearch !== undefined) {
+      url.searchParams.set('safesearch', String(options.safesearch))
     }
 
-    const timeout = AbortSignal.timeout(this.options.timeoutMs)
+    const timeout = AbortSignal.timeout(options.timeoutMs)
     const combined = signal === undefined ? timeout : AbortSignal.any([signal, timeout])
 
     let response: Response
@@ -197,7 +203,7 @@ export class SearxngSearchProvider implements WebSearchProvider {
         // A self-hosted instance has no reason to redirect a search; following
         // one would send the query to a host the deployment never configured.
         redirect: 'error',
-        headers: { accept: 'application/json', ...this.options.headers },
+        headers: { accept: 'application/json', ...options.headers },
         signal: combined,
       })
     } catch (error) {
@@ -206,7 +212,7 @@ export class SearxngSearchProvider implements WebSearchProvider {
       }
       if (timeout.aborted) {
         throw new WebError(
-          `SearXNG search timed out after ${this.options.timeoutMs}ms`,
+          `SearXNG search timed out after ${options.timeoutMs}ms`,
           'WEB_PROVIDER_ERROR',
           { cause: timeout.reason },
         )
@@ -250,6 +256,6 @@ export class SearxngSearchProvider implements WebSearchProvider {
       )
     }
 
-    return mapSearxngResponse(body, this.options.maxSnippetChars)
+    return mapSearxngResponse(body, options.maxSnippetChars)
   }
 }

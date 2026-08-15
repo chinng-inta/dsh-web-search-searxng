@@ -12,12 +12,13 @@
  */
 import type { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
+import { installSettingsSection, settingsNamespace } from '@deepseek-ai/dsh-settings'
 import {
   SEARXNG_DEFAULT_MAX_SNIPPET_CHARS,
   SEARXNG_DEFAULT_TIMEOUT_MS,
   SearxngSearchProvider,
 } from './provider.js'
-import type { SearxngTimeRange } from './provider.js'
+import type { SearxngSearchProviderOptions, SearxngTimeRange } from './provider.js'
 
 export {
   SEARXNG_DEFAULT_MAX_SNIPPET_CHARS,
@@ -39,6 +40,13 @@ export const inject = ['web']
  * `SEARXNG_URL` is the name the wider SearXNG tooling ecosystem already uses.
  */
 export const SEARXNG_BASE_URL_ENV = 'SEARXNG_URL'
+
+/**
+ * The settings namespace this plugin owns. Its section resolves as
+ * schema defaults → the plugin row's `config` (composition base) → the user
+ * layer in the harness settings document.
+ */
+export const SEARXNG_SETTINGS_NAMESPACE = settingsNamespace('web-search-searxng')
 
 /**
  * Plugin config. Every search-shaping knob lives here rather than on the tool
@@ -81,29 +89,60 @@ export const Config: z<Config> = z.object({
 }) as z<Config>
 
 /**
- * Register the SearXNG search provider with `ctx.web`.
+ * Project one resolved settings section into provider options.
  *
- * The returned disposer is deliberately not captured: registration is
- * effect-scoped and unregisters with the calling fiber, so HMR and plugin
- * disposal clean up on their own.
+ * The `$SEARXNG_URL` fallback is applied HERE rather than once at `apply`, so
+ * clearing `baseURL` in the settings document falls back to the environment
+ * again instead of stranding the provider on a value it can no longer see.
+ * @param config - the currently authoritative section.
+ * @returns options for one operation.
+ */
+function resolveOptions(config: Config): SearxngSearchProviderOptions {
+  const baseURL = config.baseURL ?? process.env[SEARXNG_BASE_URL_ENV]
+  return {
+    ...(baseURL === undefined || baseURL.length === 0 ? {} : { baseURL }),
+    ...(config.categories === undefined ? {} : { categories: config.categories }),
+    ...(config.engines === undefined ? {} : { engines: config.engines }),
+    ...(config.language === undefined ? {} : { language: config.language }),
+    ...(config.timeRange === undefined ? {} : { timeRange: config.timeRange }),
+    ...(config.safesearch === undefined ? {} : { safesearch: config.safesearch }),
+    ...(config.headers === undefined ? {} : { headers: config.headers }),
+    timeoutMs: config.timeoutMs ?? SEARXNG_DEFAULT_TIMEOUT_MS,
+    maxSnippetChars: config.maxSnippetChars ?? SEARXNG_DEFAULT_MAX_SNIPPET_CHARS,
+  }
+}
+
+/**
+ * Register the SearXNG search provider with `ctx.web`, reading its
+ * configuration through the harness settings seam when one is mounted.
+ *
+ * `installSettingsSection` registers {@link SEARXNG_SETTINGS_NAMESPACE} with
+ * this plugin row's `config` as the composition `base`, and points the source
+ * thunk at the resolved scope. When no settings service is mounted — or one
+ * goes away on reload — the thunk falls back to the composition entry, so the
+ * plugin behaves exactly as composed. Nothing here is conditional on a
+ * provider existing.
+ *
+ * The provider receives the thunk rather than a snapshot, so a settings edit
+ * reaches the NEXT search without a restart while the registration stays put.
+ *
+ * The `registerSearchProvider` disposer is deliberately not captured:
+ * registration is effect-scoped and unregisters with the calling fiber, so HMR
+ * and plugin disposal clean up on their own.
  *
  * @param ctx - plugin context carrying the web seam.
- * @param config - resolved instance and filter configuration.
+ * @param config - this plugin row's composition entry config.
  */
 export function apply(ctx: Context, config: Config): void {
-  const baseURL = config.baseURL ?? process.env[SEARXNG_BASE_URL_ENV]
+  let current = (): Config => config
+  installSettingsSection(ctx, SEARXNG_SETTINGS_NAMESPACE, Config, config, {
+    setSource: (source) => {
+      current = source
+    },
+    // Nothing is memoized from the section: every operation projects it fresh,
+    // so there is no derived state to re-judge on a change.
+    onChange: () => {},
+  })
 
-  ctx.web.registerSearchProvider(
-    new SearxngSearchProvider({
-      ...(baseURL === undefined ? {} : { baseURL }),
-      ...(config.categories === undefined ? {} : { categories: config.categories }),
-      ...(config.engines === undefined ? {} : { engines: config.engines }),
-      ...(config.language === undefined ? {} : { language: config.language }),
-      ...(config.timeRange === undefined ? {} : { timeRange: config.timeRange }),
-      ...(config.safesearch === undefined ? {} : { safesearch: config.safesearch }),
-      ...(config.headers === undefined ? {} : { headers: config.headers }),
-      timeoutMs: config.timeoutMs ?? SEARXNG_DEFAULT_TIMEOUT_MS,
-      maxSnippetChars: config.maxSnippetChars ?? SEARXNG_DEFAULT_MAX_SNIPPET_CHARS,
-    }),
-  )
+  ctx.web.registerSearchProvider(new SearxngSearchProvider(() => resolveOptions(current())))
 }

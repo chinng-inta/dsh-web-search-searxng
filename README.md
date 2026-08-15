@@ -51,6 +51,24 @@ or rate-limit aggressively. Run your own.
 
 ## Configuration
 
+The plugin owns the `web-search-searxng` settings namespace, so its section resolves in the harness's
+own layering:
+
+```
+schema defaults  →  the plugin row's `config` (composition base)  →  the user layer in the settings document
+```
+
+`baseURL` additionally falls back to `$SEARXNG_URL` when no layer sets it. Nothing else is needed to
+get started: export the variable and the provider is configured.
+
+The section is projected **per search**, so an edit to the settings document reaches the next search
+without a restart — and clearing `baseURL` falls back to the environment again rather than stranding
+the provider on a value it can no longer see. Registration itself never moves, so provider selection
+does not flicker when configuration changes.
+
+A deployment without a settings provider mounted keeps working: the source falls back to the
+composition entry, exactly as composed.
+
 All keys are optional.
 
 | Key | Default | Meaning |
@@ -65,6 +83,8 @@ All keys are optional.
 | `maxSnippetChars` | `500` | Per-source snippet cap. |
 | `headers` | none | Extra request headers, e.g. for an instance behind an authenticating proxy. |
 
+As the plugin row's composition base:
+
 ```yaml
 - id: web-search-searxng
   name: 'dsh-web-search-searxng'
@@ -74,6 +94,15 @@ All keys are optional.
     categories:
       - general
       - news
+```
+
+…or as the user layer in the harness settings document (`$DSH_HOME/settings.yaml` by default),
+which wins over the row above and is what a configuration surface writes:
+
+```yaml
+web-search-searxng:
+  language: ja
+  maxSnippetChars: 300
 ```
 
 Every search-shaping knob is a **deployment setting, not a model argument**. The seam's
@@ -150,6 +179,7 @@ search, and following one would send the query to a host the deployment never co
 
 | This package | DeepSeek Harness |
 |---|---|
+| `0.2.x` | `0.1.0-rc.6` |
 | `0.1.x` | `0.1.0-rc.6` |
 
 The harness is a developer preview with breaking changes between release candidates, and its

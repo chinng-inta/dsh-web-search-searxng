@@ -5,16 +5,32 @@ import { SearxngSearchProvider, mapSearxngResponse } from '../lib/provider.js'
 
 const OPTIONS = { timeoutMs: 10_000, maxSnippetChars: 500 }
 
+/** Build a provider over a fixed options snapshot. */
+const provider = (options) => new SearxngSearchProvider(() => ({ ...OPTIONS, ...options }))
+
 describe('available()', () => {
   it('accepts an http(s) base URL', () => {
-    assert.equal(new SearxngSearchProvider({ ...OPTIONS, baseURL: 'http://s:8888' }).available(), true)
-    assert.equal(new SearxngSearchProvider({ ...OPTIONS, baseURL: 'https://s' }).available(), true)
+    assert.equal(provider({ baseURL: 'http://s:8888' }).available(), true)
+    assert.equal(provider({ baseURL: 'https://s' }).available(), true)
   })
 
   it('reports unavailable rather than throwing on a missing or unusable base URL', () => {
     for (const baseURL of [undefined, '', '   ', 'not a url', 'ftp://s', 'file:///etc/passwd']) {
-      assert.equal(new SearxngSearchProvider({ ...OPTIONS, baseURL }).available(), false, String(baseURL))
+      assert.equal(provider({ baseURL }).available(), false, String(baseURL))
     }
+  })
+
+  it('reads the options thunk on every call, so a settings edit takes effect live', () => {
+    // The settings section is projected per operation; capturing it at
+    // construction would strand the provider on the boot-time value.
+    let baseURL
+    const live = new SearxngSearchProvider(() => ({ ...OPTIONS, baseURL }))
+
+    assert.equal(live.available(), false)
+    baseURL = 'http://configured-later:8888'
+    assert.equal(live.available(), true)
+    baseURL = undefined
+    assert.equal(live.available(), false)
   })
 })
 
