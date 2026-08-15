@@ -17,6 +17,7 @@ import { bindSnapshotSelector } from '@deepseek-ai/dsh-client-web-react'
 import { SEARXNG_LOCALE_NS, en, zh } from './locales.js'
 import { SearxngCard } from './SearxngCard.tsx'
 import { SearxngSettingsController } from './searxng-store.js'
+import { installCardStyles } from './styles.js'
 
 export { SEARXNG_LOCALE_NS } from './locales.js'
 export { SearxngSettingsController, LANGUAGE_CHOICES } from './searxng-store.js'
@@ -36,6 +37,11 @@ export const inject = ['slots', 'locale', 'connection']
  * @param ctx - client root context.
  */
 export function apply(ctx: any): void {
+  // The card's class names match nothing until this lands: without it the card
+  // still renders, just with browser defaults, which reads as a broken UI
+  // rather than a missing stylesheet.
+  ctx.effect(() => installCardStyles(), 'web-search-searxng: card styles')
+
   ctx.effect(
     () => ctx.locale.register(SEARXNG_LOCALE_NS, { zh, en }),
     'web-search-searxng: dictionaries',

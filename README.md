@@ -179,8 +179,12 @@ search, and following one would send the query to a host the deployment never co
 
 | This package | DeepSeek Harness |
 |---|---|
+| `0.3.x` | `0.1.0-rc.6` |
 | `0.2.x` | `0.1.0-rc.6` |
 | `0.1.x` | `0.1.0-rc.6` |
+
+`0.3.0` shipped the settings card without its stylesheet — it works, but renders with browser
+defaults. Use `0.3.1` or later.
 
 The harness is a developer preview with breaking changes between release candidates, and its
 packages publish the active line under the **`next`** dist-tag (`latest` still points at the older
