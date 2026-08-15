@@ -65,7 +65,8 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "node --test test/*.test.js",
     "prepublishOnly": "npm run build && npm test",
-    "build:client": "tsx scripts/build-client.ts && tsc -p tsconfig.client.json"
+    "build:client": "tsx scripts/build-client.ts && tsc -p tsconfig.client.json",
+    "prepare": "npm run build"
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": ">=4.0.1",
