@@ -144,6 +144,42 @@ export function mapSearxngResponse(
   }
 }
 
+/** Cap on the error body read back from a rejected request. */
+const ERROR_BODY_MAX_CHARS = 300
+
+/**
+ * Read the instance's own reason for refusing a request.
+ *
+ * SearXNG answers a bad parameter with `{"error": "Invalid value <x> for
+ * parameter <name>"}` — the one string naming WHICH setting is wrong. It
+ * validates a language's shape but not whether the locale exists, so a
+ * malformed value is the only kind it reports at all; quoting the reason is
+ * what turns "HTTP 400" into something a user can act on.
+ * @param response - the non-2xx response, whose body is still unread.
+ * @returns the reason, or `undefined` when the body carries none.
+ */
+async function instanceErrorText(response: Response): Promise<string | undefined> {
+  let text: string
+  try {
+    text = await response.text()
+  } catch {
+    // Failing to read the error body must never replace the status we do know.
+    return undefined
+  }
+  try {
+    const body: unknown = JSON.parse(text)
+    if (typeof body === 'object' && body !== null && 'error' in body) {
+      const error = (body as { error: unknown }).error
+      if (typeof error === 'string' && error.trim().length > 0) {
+        return cap(error.trim(), ERROR_BODY_MAX_CHARS)
+      }
+    }
+  } catch {
+    // Not JSON: an HTML error page carries no reason worth quoting at a model.
+  }
+  return undefined
+}
+
 /**
  * The SearXNG-backed search provider. Redirects are refused as `WEB_PROVIDER_ERROR`.
  *
@@ -229,8 +265,12 @@ export class SearxngSearchProvider implements WebSearchProvider {
         response.status === 403
           ? ' (a public instance often refuses programmatic access; run your own instance or allow this client)'
           : ''
+      // A rejected parameter carries its reason in the body (`Invalid value
+      // <x> for parameter language`). That names the misconfigured setting,
+      // which a bare status code cannot, so it rides the message.
+      const reason = await instanceErrorText(response)
       throw new WebError(
-        `SearXNG search failed with HTTP ${response.status}${hint}`,
+        `SearXNG search failed with HTTP ${response.status}${reason === undefined ? '' : `: ${reason}`}${hint}`,
         'WEB_PROVIDER_ERROR',
       )
     }

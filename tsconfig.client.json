@@ -1,0 +1,17 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "lib": ["ES2023", "DOM"],
+    "types": ["node", "react"],
+    "outDir": "lib/client",
+    "rootDir": "src/client",
+    "declaration": true,
+    "emitDeclarationOnly": true,
+    "allowImportingTsExtensions": true
+  },
+  // The base config excludes src/client (the host build must not see JSX);
+  // this build is the one that owns it, so the exclusion is cleared.
+  "exclude": [],
+  "include": ["src/client/**/*.ts", "src/client/**/*.tsx"]
+}

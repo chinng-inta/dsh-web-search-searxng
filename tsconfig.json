@@ -16,5 +16,9 @@
     "skipLibCheck": true,
     "types": ["node"]
   },
-  "include": ["src/**/*.ts"]
+  "include": ["src/**/*.ts"],
+  // The browser half is built by scripts/build-client.ts (bundle) plus
+  // tsconfig.client.json (declarations); it needs JSX and DOM libs the host
+  // build deliberately does not enable.
+  "exclude": ["src/client"]
 }
