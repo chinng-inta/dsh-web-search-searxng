@@ -1,6 +1,6 @@
 {
   "name": "dsh-web-search-searxng",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "SearXNG-backed web search provider for the DeepSeek Harness web capability seam (ctx.web) — self-hosted metasearch, no API key, no model turn per search",
   "keywords": [
     "deepseek",
@@ -55,6 +55,8 @@
   "peerDependencies": {
     "@deepseek-ai/cordis": ">=4.0.1",
     "@deepseek-ai/dsh-settings": ">=0.1.0-rc.6",
+    "@deepseek-ai/dsh-typert-protocol": ">=0.1.0-rc.6",
+    "@deepseek-ai/dsh-typert-registry": ">=0.1.0-rc.6",
     "@deepseek-ai/dsh-web": ">=0.1.0-rc.6"
   },
   "dependencies": {
@@ -63,6 +65,8 @@
   "devDependencies": {
     "@deepseek-ai/cordis": "4.0.1",
     "@deepseek-ai/dsh-settings": "0.1.0-rc.6",
+    "@deepseek-ai/dsh-typert-protocol": "0.1.0-rc.6",
+    "@deepseek-ai/dsh-typert-registry": "0.1.0-rc.6",
     "@deepseek-ai/dsh-web": "0.1.0-rc.6",
     "@types/node": "^22.15.0",
     "typescript": "^5.7.0"
