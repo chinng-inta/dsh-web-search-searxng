@@ -13,7 +13,6 @@
  *
  * @module dsh-web-search-searxng/client
  */
-import { bindSnapshotSelector } from '@deepseek-ai/dsh-client-web-react'
 import { SEARXNG_LOCALE_NS, en, zh } from './locales.js'
 import { SearxngCard } from './SearxngCard.tsx'
 import { SearxngSettingsController } from './searxng-store.js'
@@ -24,6 +23,18 @@ export { SearxngSettingsController, LANGUAGE_CHOICES } from './searxng-store.js'
 export type { SearxngCardState, SearxngSettingsView } from './searxng-store.js'
 export { SearxngCard } from './SearxngCard.tsx'
 export type { SearxngCardInjected, SearxngCardProps } from './SearxngCard.tsx'
+
+/**
+ * The cell this card occupies.
+ *
+ * `settings.plugin.item` is a keyed slot: its owner enumerates the settings
+ * namespaces the Host exposes and dispatches one key per namespace, so a card
+ * is addressed by the namespace it edits. This must therefore equal
+ * `SEARXNG_SETTINGS_NAMESPACE` in the host half. It is repeated as a literal
+ * rather than imported because that module pulls in server-side packages that
+ * have no place in a browser bundle.
+ */
+const SEARXNG_SETTINGS_KEY = 'web-search-searxng'
 
 /**
  * Required client services. The card registration waits on the slot
@@ -49,16 +60,19 @@ export function apply(ctx: any): void {
 
   const connection = ctx.get('connection')
   const controller = new SearxngSettingsController(connection.rpc)
-  const useSnapshot = bindSnapshotSelector(controller.store)
 
   ctx.slots.inject('settings.plugin.item', function* () {
+    // The `hooks` compartment is the sanctioned way to make a store reactive:
+    // the renderer binds each entry to a selector hook and hands it over as
+    // `use<Name>` — `searxngCard` arrives at the card as `useSearxngCard`.
+    // Binding it here instead would mean reaching for a React binder the shell
+    // no longer publishes to plugins.
     yield ctx.slots.register(
       {
         name: 'settings.plugin.item',
-        id: 'web-search-searxng',
-        order: 40,
+        key: SEARXNG_SETTINGS_KEY,
         locale: SEARXNG_LOCALE_NS,
-        inject: () => ({ controller, useSnapshot }),
+        inject: () => ({ controller, hooks: { searxngCard: controller.store } }),
       },
       SearxngCard,
     )

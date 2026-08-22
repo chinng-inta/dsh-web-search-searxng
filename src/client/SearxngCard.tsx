@@ -23,7 +23,12 @@ import type { SearxngCardState, SearxngSettingsController } from './searxng-stor
 /** Injected face the slot registration hands this card. */
 export interface SearxngCardInjected {
   controller: SearxngSettingsController
-  useSnapshot: <T>(select: (snapshot: SearxngCardState) => T) => T
+  /**
+   * Selector hook over the card's store. The registration hands the store to
+   * the renderer as `hooks.searxngCard`; the renderer binds it and delivers it
+   * here under the capitalized `use` name.
+   */
+  useSearxngCard: <T>(select: (snapshot: SearxngCardState) => T) => T
 }
 
 /** Props delivered by the slot outlet: the inject face plus the locale seat. */
@@ -36,8 +41,8 @@ export type SearxngCardProps = SearxngCardInjected & {
  * @param props - injected controller/hook and the synthesized `t` seat.
  * @returns the card element.
  */
-export function SearxngCard({ controller, useSnapshot, t }: SearxngCardProps): ReactNode {
-  const state = useSnapshot((snapshot) => snapshot)
+export function SearxngCard({ controller, useSearxngCard, t }: SearxngCardProps): ReactNode {
+  const state = useSearxngCard((snapshot) => snapshot)
   const [open, setOpen] = useState(false)
 
   useEffect(() => {

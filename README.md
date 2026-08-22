@@ -202,10 +202,21 @@ search, and following one would send the query to a host the deployment never co
 
 | This package | DeepSeek Harness |
 |---|---|
-| `0.3.2`+ | `0.1.0-rc.6` — installable straight from git (`prepare` builds on install) |
-| `0.3.x` | `0.1.0-rc.6` |
-| `0.2.x` | `0.1.0-rc.6` |
-| `0.1.x` | `0.1.0-rc.6` |
+| `0.3.3`+ | `0.1.0-rc.8` |
+| `0.1.x` – `0.3.2` | `0.1.0-rc.6` |
+
+**`0.3.3` is not backward compatible, and neither is anything before it forward compatible.**
+Installing the wrong pair does not merely lose this card — it fails the whole Web UI's plugin
+load, because both breakages surface as an unanswerable client `require` or an invalid slot
+registration ([#1](https://github.com/chinng-inta/dsh-web-search-searxng/issues/1)):
+
+- rc.8 dropped `@deepseek-ai/dsh-client-web-react` from the loader's seed table. Up to `0.3.2`
+  this package imported `bindSnapshotSelector` from it. `0.3.3` hands its store to the renderer
+  through the slot inject face's `hooks` compartment instead, which is where rc.8 synthesizes
+  selector hooks.
+- rc.8 turned `settings.plugin.item` from a `list` slot (`id` + `order`) into a `keyed` one
+  (`key` = the settings namespace the card edits). `0.3.3` registers the keyed way, which rc.6
+  rejects.
 
 `0.3.0` shipped the settings card without its stylesheet — it works, but renders with browser
 defaults. Use `0.3.1` or later.
