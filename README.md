@@ -202,13 +202,14 @@ search, and following one would send the query to a host the deployment never co
 
 | This package | DeepSeek Harness |
 |---|---|
-| `0.3.3`+ | `0.1.0-rc.8` |
+| `0.4.0`+ | `0.1.2-rc.1` |
+| `0.3.3` – `0.3.x` | `0.1.0-rc.8` – `0.1.1-rc.2` |
 | `0.1.x` – `0.3.2` | `0.1.0-rc.6` |
 
-**`0.3.3` is not backward compatible, and neither is anything before it forward compatible.**
-Installing the wrong pair does not merely lose this card — it fails the whole Web UI's plugin
-load, because both breakages surface as an unanswerable client `require` or an invalid slot
-registration ([#1](https://github.com/chinng-inta/dsh-web-search-searxng/issues/1)):
+**Every row is mutually exclusive**: nothing here is backward compatible, and nothing older is
+forward compatible. Installing the wrong pair does not merely lose this card — it fails the whole
+Web UI's plugin load, because the breakages surface as an unanswerable client `require` or an
+invalid slot registration ([#1](https://github.com/chinng-inta/dsh-web-search-searxng/issues/1)):
 
 - rc.8 dropped `@deepseek-ai/dsh-client-web-react` from the loader's seed table. Up to `0.3.2`
   this package imported `bindSnapshotSelector` from it. `0.3.3` hands its store to the renderer
@@ -217,6 +218,14 @@ registration ([#1](https://github.com/chinng-inta/dsh-web-search-searxng/issues/
 - rc.8 turned `settings.plugin.item` from a `list` slot (`id` + `order`) into a `keyed` one
   (`key` = the settings namespace the card edits). `0.3.3` registers the keyed way, which rc.6
   rejects.
+- 0.1.2-alpha.1 deleted `@deepseek-ai/dsh-client-runtime` outright. Up to `0.3.x` this package
+  took `createSnapshotStore` from it and named it in `dsh.client.inject`; `0.4.0` takes the same
+  function from `@deepseek-ai/dsh-client-store` (a seed the frontend now hands the loader) and
+  drops the phantom from `inject`, which would otherwise leave the row pending forever.
+- 0.1.2-alpha.2 deleted the `settingsNamespace()` and `installSettingsSection()` helpers from
+  `@deepseek-ai/dsh-settings`. `0.4.0` uses a bare namespace literal and calls
+  `settings.installSection` inside `ctx.inject(['settings'], …)`, which is now the attach/detach
+  lifecycle.
 
 `0.3.0` shipped the settings card without its stylesheet — it works, but renders with browser
 defaults. Use `0.3.1` or later.

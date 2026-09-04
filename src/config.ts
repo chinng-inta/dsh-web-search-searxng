@@ -8,7 +8,6 @@
  * @module dsh-web-search-searxng/config
  */
 import z from '@deepseek-ai/schemastery'
-import { settingsNamespace } from '@deepseek-ai/dsh-settings'
 import { SEARXNG_DEFAULT_MAX_SNIPPET_CHARS, SEARXNG_DEFAULT_TIMEOUT_MS } from './provider.js'
 import type { SearxngSearchProviderOptions, SearxngTimeRange } from './provider.js'
 
@@ -22,8 +21,13 @@ export const SEARXNG_BASE_URL_ENV = 'SEARXNG_URL'
  * The settings namespace this plugin owns. Its section resolves as
  * schema defaults → the plugin row's `config` (composition base) → the user
  * layer in the harness settings document.
+ *
+ * A bare literal, not a branded value: `settingsNamespace()` was deleted in
+ * 0.1.2-alpha.2 and the grammar is now checked at compile time by the
+ * `Namespace & SettingsNamespaceInput<Namespace>` parameter every settings
+ * method takes, which a `const` string literal satisfies on its own.
  */
-export const SEARXNG_SETTINGS_NAMESPACE = settingsNamespace('web-search-searxng')
+export const SEARXNG_SETTINGS_NAMESPACE = 'web-search-searxng'
 
 /**
  * Plugin config. Every search-shaping knob lives here rather than on the tool

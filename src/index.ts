@@ -11,7 +11,7 @@
  * @module dsh-web-search-searxng
  */
 import type { Context } from '@deepseek-ai/cordis'
-import { installSettingsSection } from '@deepseek-ai/dsh-settings'
+import type {} from '@deepseek-ai/dsh-settings'
 import { Config, SEARXNG_SETTINGS_NAMESPACE, resolveOptions } from './config.js'
 import { SearxngConfigGateway, searxngTypertContribution } from './gateway.js'
 import { SearxngSearchProvider } from './provider.js'
@@ -52,12 +52,14 @@ export const inject = ['web']
  * configuration through the harness settings seam when one is mounted, and
  * expose that configuration to a browser half over the plugin's own endpoints.
  *
- * `installSettingsSection` registers {@link SEARXNG_SETTINGS_NAMESPACE} with
+ * `settings.installSection` registers {@link SEARXNG_SETTINGS_NAMESPACE} with
  * this plugin row's `config` as the composition `base`, and points the source
- * thunk at the resolved scope. When no settings service is mounted — or one
- * goes away on reload — the thunk falls back to the composition entry, so the
- * plugin behaves exactly as composed. Nothing here is conditional on a
- * provider existing.
+ * thunk at the resolved scope. It is the provider's own method as of
+ * 0.1.2-alpha.2 (the standalone `installSettingsSection` helper was deleted),
+ * so the call sits inside `ctx.inject(['settings'], …)`: that injection IS the
+ * attach/detach lifecycle. Without a settings service the callback never runs
+ * and the thunk stays on the composition entry, so the plugin behaves exactly
+ * as composed. Nothing here is conditional on a provider existing.
  *
  * The provider receives the thunk rather than a snapshot, so a settings edit
  * reaches the NEXT search without a restart while the registration stays put.
@@ -75,13 +77,15 @@ export const inject = ['web']
  */
 export function apply(ctx: Context, config: Config): void {
   let current = (): Config => config
-  installSettingsSection(ctx, SEARXNG_SETTINGS_NAMESPACE, Config, config, {
-    setSource: (source) => {
-      current = source
-    },
-    // Nothing is memoized from the section: every operation projects it fresh,
-    // so there is no derived state to re-judge on a change.
-    onChange: () => {},
+  ctx.inject(['settings'], (sctx) => {
+    sctx.settings.installSection(ctx, SEARXNG_SETTINGS_NAMESPACE, Config, config, {
+      setSource: (source) => {
+        current = source
+      },
+      // Nothing is memoized from the section: every operation projects it fresh,
+      // so there is no derived state to re-judge on a change.
+      onChange: () => {},
+    })
   })
 
   ctx.web.registerSearchProvider(new SearxngSearchProvider(() => resolveOptions(current())))

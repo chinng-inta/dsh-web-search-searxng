@@ -2,13 +2,14 @@
  * Card state over the plugin's own gateway.
  *
  * The section rides `connection.rpc` → `/api/web-search-searxng/{get,set,reset}`
- * rather than the generic settings API, because the API proxy serves only an
- * allowlist of namespaces and a third-party one is not on it. See the host
- * gateway module for why that is the sanctioned route rather than a workaround.
+ * rather than the generic settings API, because that API serves only the
+ * allowlist `exposedNamespaces()` returns and a third-party namespace is not on
+ * it. See the host gateway module for why that is the sanctioned route rather
+ * than a workaround.
  *
  * @module dsh-web-search-searxng/client/searxng-store
  */
-import { createSnapshotStore } from '@deepseek-ai/dsh-client-runtime/client'
+import { createSnapshotStore } from '@deepseek-ai/dsh-client-store'
 
 /** The languages the card offers, in menu order. */
 export const LANGUAGE_CHOICES = [

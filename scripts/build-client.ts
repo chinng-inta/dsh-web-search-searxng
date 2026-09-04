@@ -33,17 +33,17 @@ const OUT_FILE = 'index.js'
 /**
  * What the browser loader can actually answer at runtime.
  *
- * The first seven are the seed table the web frontend hands the loader as
- * `staticModules`; the last resolves through the registered factory of a
- * loaded plugin. Do not trust this comment — re-derive the seed list from the
+ * All eight are the seed table the web frontend hands the loader as
+ * `staticModules`. Do not trust this comment — re-derive the seed list from the
  * image you are targeting:
  *
  *   docker run --rm --entrypoint sh <image> -c 'grep -ohE "return\{react:[^}]*\}" \
  *     $(npm root -g)/@deepseek-ai/dsh/node_modules/@deepseek-ai/dsh-web-frontend/dist/assets/index-*.js'
  *
- * This is rc.8's table, a strict subset of rc.6's: rc.8 removed
- * `dsh-client-web-react`, `dsh-client-ui-attachment` and
- * `dsh-client-schema-form`. Entries kept here "just in case" are not free. The
+ * This is 0.1.2-rc.1's table. Against rc.8 it drops nothing and adds
+ * `dsh-client-store`, which is where `createSnapshotStore` and `defineStore`
+ * landed when 0.1.2-alpha.1 deleted `@deepseek-ai/dsh-client-runtime`
+ * altogether. Entries kept here "just in case" are not free. The
  * assertion at the bottom of this file compares the bundle against THIS list
  * and nothing else, so a name listed here that the shell does not seed passes
  * the build and fails the user's Web UI instead — which is exactly how issue #1
@@ -55,9 +55,9 @@ const CLIENT_EXTERNALS: readonly string[] = [
   'react-dom',
   'react-dom/client',
   '@deepseek-ai/cordis',
+  '@deepseek-ai/dsh-client-store',
   '@deepseek-ai/dsh-client-ui-slots',
   '@deepseek-ai/dsh-client-ui-primitives',
-  '@deepseek-ai/dsh-client-runtime/client',
 ]
 
 await build({
