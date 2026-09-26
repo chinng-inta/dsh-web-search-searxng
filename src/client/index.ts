@@ -1,15 +1,21 @@
 /**
- * Browser half: registers the SearXNG card into the settings
- * "plugin configuration" page (`settings.plugin.item`).
+ * Browser half: registers the SearXNG settings page on the Plugins page
+ * (`plugins.row.config`). The bundle page lists this package's
+ * `web-search-searxng` row, and the row gains a configure control that opens
+ * {@link SearxngCard} as a full page.
+ *
+ * 0.1.7-rc.2 deleted the settings "plugin configuration" page and its
+ * `settings.plugin.item` slot outright. The registration is wrapped in
+ * `ctx.slots.inject`, which waits for the slot declaration, so against a shell
+ * that lacks the slot the page silently never appears; the rest of the UI
+ * survives.
  *
  * The card reads and writes through the plugin's OWN endpoints
- * (`connection.rpc` → `/api/web-search-searxng/*`). The generic settings API
- * cannot serve a third-party namespace — `exposedNamespaces()` is an explicit
- * allowlist — so this channel is the sanctioned route, not a workaround.
+ * (`connection.rpc` -> `/api/web-search-searxng/*`).
  *
  * Only value imports listed in the bundle's externals may appear in this
  * graph; every other `@deepseek-ai/*` import must be type-only. Violating that
- * does not degrade this card — it fails the whole Web UI's plugin load.
+ * does not degrade this card: it fails the whole Web UI's plugin load.
  *
  * @module dsh-web-search-searxng/client
  */
@@ -25,16 +31,14 @@ export { SearxngCard } from './SearxngCard.tsx'
 export type { SearxngCardInjected, SearxngCardProps } from './SearxngCard.tsx'
 
 /**
- * The cell this card occupies.
- *
- * `settings.plugin.item` is a keyed slot: its owner enumerates the settings
- * namespaces the Host exposes and dispatches one key per namespace, so a card
- * is addressed by the namespace it edits. This must therefore equal
- * `SEARXNG_SETTINGS_NAMESPACE` in the host half. It is repeated as a literal
- * rather than imported because that module pulls in server-side packages that
- * have no place in a browser bundle.
+ * The cell on the Plugins page: `plugins.row.config` is keyed by
+ * `<package name>#<row id>`, with the row id exactly as `cordis.patch.yml`
+ * inserts it. Renaming either side without the other leaves the row without a
+ * configure control. Repeated as a literal rather than imported from the host
+ * half, whose modules pull in server-side packages that have no place in a
+ * browser bundle.
  */
-const SEARXNG_SETTINGS_KEY = 'web-search-searxng'
+const SEARXNG_ROW_CONFIG_KEY = 'dsh-web-search-searxng#web-search-searxng'
 
 /**
  * Required client services. The card registration waits on the slot
@@ -43,8 +47,7 @@ const SEARXNG_SETTINGS_KEY = 'web-search-searxng'
 export const inject = ['slots', 'locale', 'connection']
 
 /**
- * Register the dictionaries and the card once the `settings.plugin.item`
- * declaration is on the ledger.
+ * Register the dictionaries and the page once `plugins.row.config` is declared.
  * @param ctx - client root context.
  */
 export function apply(ctx: any): void {
@@ -61,16 +64,18 @@ export function apply(ctx: any): void {
   const connection = ctx.get('connection')
   const controller = new SearxngSettingsController(connection.rpc)
 
-  ctx.slots.inject('settings.plugin.item', function* () {
+  // The owner renders the entry twice: `view: 'summary'` as the row's
+  // one-liner, `view: 'page'` as the configure page's body.
+  ctx.slots.inject('plugins.row.config', function* () {
     // The `hooks` compartment is the sanctioned way to make a store reactive:
     // the renderer binds each entry to a selector hook and hands it over as
-    // `use<Name>` — `searxngCard` arrives at the card as `useSearxngCard`.
+    // `use<Name>`, so `searxngCard` arrives at the card as `useSearxngCard`.
     // Binding it here instead would mean reaching for a React binder the shell
     // no longer publishes to plugins.
     yield ctx.slots.register(
       {
-        name: 'settings.plugin.item',
-        key: SEARXNG_SETTINGS_KEY,
+        name: 'plugins.row.config',
+        key: SEARXNG_ROW_CONFIG_KEY,
         locale: SEARXNG_LOCALE_NS,
         inject: () => ({ controller, hooks: { searxngCard: controller.store } }),
       },

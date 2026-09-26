@@ -7,6 +7,7 @@
  *
  * @module dsh-web-search-searxng/config
  */
+import type { Volatile } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import { SEARXNG_DEFAULT_MAX_SNIPPET_CHARS, SEARXNG_DEFAULT_TIMEOUT_MS } from './provider.js'
 import type { SearxngSearchProviderOptions, SearxngTimeRange } from './provider.js'
@@ -18,14 +19,14 @@ import type { SearxngSearchProviderOptions, SearxngTimeRange } from './provider.
 export const SEARXNG_BASE_URL_ENV = 'SEARXNG_URL'
 
 /**
- * The settings namespace this plugin owns. Its section resolves as
- * schema defaults → the plugin row's `config` (composition base) → the user
- * layer in the harness settings document.
+ * The profile entry id this plugin's settings are written under.
  *
- * A bare literal, not a branded value: `settingsNamespace()` was deleted in
- * 0.1.2-alpha.2 and the grammar is now checked at compile time by the
- * `Namespace & SettingsNamespaceInput<Namespace>` parameter every settings
- * method takes, which a `const` string literal satisfies on its own.
+ * Since 0.1.7-rc.2 the settings service addresses a plugin by its profile
+ * ENTRY id and writes edits into the active profile's patch; the shared
+ * `settings.yaml` document and the per-plugin namespace registration
+ * (`settings.installSection`) are gone. This therefore must equal the row id
+ * `cordis.patch.yml` inserts — renaming one without the other makes every
+ * write fail with `No configurable plugin entry`.
  */
 export const SEARXNG_SETTINGS_NAMESPACE = 'web-search-searxng'
 
@@ -57,17 +58,34 @@ export interface Config {
   headers?: Record<string, string>
 }
 
+/**
+ * The config `apply` actually receives: every field is `.volatile()`, so the
+ * loader hands over a live reference per field instead of a value. A settings
+ * edit updates the reference in place — the plugin is NOT restarted — which is
+ * why the provider reads through {@link snapshotConfig} on every operation.
+ */
+export type LiveConfig = { readonly [K in keyof Config]-?: Volatile<Config[K] | undefined> }
+
+/**
+ * Every field is `.volatile()`. That is not a style choice: the settings
+ * service refuses to write a field that is not (`Config field "…" is not
+ * volatile`), and refuses an entry with none at all (`has no volatile fields`).
+ *
+ * The declared type is the plain {@link Config} shape, because that is what
+ * the schema validates when called directly (the gateway's patch check); the
+ * loader-side projection into references is {@link LiveConfig}.
+ */
 export const Config: z<Config> = z.object({
-  baseURL: z.string(),
-  categories: z.array(z.string()),
-  engines: z.array(z.string()),
-  language: z.string(),
-  timeRange: z.union(['day', 'week', 'month', 'year'] as const),
-  safesearch: z.union([0, 1, 2] as const),
-  timeoutMs: z.number().step(1).min(1).default(SEARXNG_DEFAULT_TIMEOUT_MS),
-  maxSnippetChars: z.number().step(1).min(1).default(SEARXNG_DEFAULT_MAX_SNIPPET_CHARS),
-  headers: z.dict(z.string()),
-}) as z<Config>
+  baseURL: z.string().volatile(),
+  categories: z.array(z.string()).volatile(),
+  engines: z.array(z.string()).volatile(),
+  language: z.string().volatile(),
+  timeRange: z.union(['day', 'week', 'month', 'year'] as const).volatile(),
+  safesearch: z.union([0, 1, 2] as const).volatile(),
+  timeoutMs: z.number().step(1).min(1).default(SEARXNG_DEFAULT_TIMEOUT_MS).volatile(),
+  maxSnippetChars: z.number().step(1).min(1).default(SEARXNG_DEFAULT_MAX_SNIPPET_CHARS).volatile(),
+  headers: z.dict(z.string()).volatile(),
+}) as unknown as z<Config>
 
 /** Every key the schema declares; the gate a patch from the wire must pass. */
 export const CONFIG_KEYS: readonly string[] = [
@@ -81,6 +99,21 @@ export const CONFIG_KEYS: readonly string[] = [
   'maxSnippetChars',
   'headers',
 ]
+
+/**
+ * Read every live reference once, dropping the unset ones, so one operation
+ * sees one consistent section even if an edit lands mid-flight.
+ * @param live - the config `apply` received.
+ * @returns the section as it stands now.
+ */
+export function snapshotConfig(live: LiveConfig): Config {
+  const section: Record<string, unknown> = {}
+  for (const key of CONFIG_KEYS as readonly (keyof Config)[]) {
+    const value = live[key].get()
+    if (value !== undefined) section[key] = value
+  }
+  return section as Config
+}
 
 /** Where the effective instance URL came from, for a configuration surface. */
 export type BaseUrlSource = 'settings' | 'environment' | 'none'

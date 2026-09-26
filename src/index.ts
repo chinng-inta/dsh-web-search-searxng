@@ -12,7 +12,8 @@
  */
 import type { Context } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-settings'
-import { Config, SEARXNG_SETTINGS_NAMESPACE, resolveOptions } from './config.js'
+import { Config, resolveOptions, snapshotConfig } from './config.js'
+import type { LiveConfig } from './config.js'
 import { SearxngConfigGateway, searxngTypertContribution } from './gateway.js'
 import { SearxngSearchProvider } from './provider.js'
 
@@ -30,8 +31,9 @@ export {
   SEARXNG_SETTINGS_NAMESPACE,
   resolveBaseURL,
   resolveOptions,
+  snapshotConfig,
 } from './config.js'
-export type { BaseUrlSource } from './config.js'
+export type { BaseUrlSource, LiveConfig } from './config.js'
 export {
   SEARXNG_GATEWAY_NAMESPACE,
   SEARXNG_GATEWAY_SERVICE,
@@ -48,21 +50,18 @@ export const name = 'web-search-searxng'
 export const inject = ['web']
 
 /**
- * Register the SearXNG search provider with `ctx.web`, reading its
- * configuration through the harness settings seam when one is mounted, and
- * expose that configuration to a browser half over the plugin's own endpoints.
+ * Register the SearXNG search provider with `ctx.web`, and expose its
+ * configuration to a browser half over the plugin's own endpoints.
  *
- * `settings.installSection` registers {@link SEARXNG_SETTINGS_NAMESPACE} with
- * this plugin row's `config` as the composition `base`, and points the source
- * thunk at the resolved scope. It is the provider's own method as of
- * 0.1.2-alpha.2 (the standalone `installSettingsSection` helper was deleted),
- * so the call sits inside `ctx.inject(['settings'], …)`: that injection IS the
- * attach/detach lifecycle. Without a settings service the callback never runs
- * and the thunk stays on the composition entry, so the plugin behaves exactly
- * as composed. Nothing here is conditional on a provider existing.
+ * Every Config field is volatile (see `Config`), so `config` holds live
+ * references that a settings edit updates in place. The provider and the
+ * gateway both read through {@link snapshotConfig} per operation, so an edit
+ * reaches the NEXT search without a restart.
  *
- * The provider receives the thunk rather than a snapshot, so a settings edit
- * reaches the NEXT search without a restart while the registration stays put.
+ * Nothing registers a settings section any more: 0.1.7-rc.2 deleted
+ * `settings.installSection` along with the shared `settings.yaml`. The
+ * settings service now finds this plugin by its profile entry id and derives
+ * the form from the exported `Config` schema on its own.
  *
  * The configuration gateway is mounted only where a typert registry exists (the
  * web app); a headless composition simply has no browser to serve, so its
@@ -73,25 +72,15 @@ export const inject = ['web']
  * and plugin disposal clean up on their own.
  *
  * @param ctx - plugin context carrying the web seam.
- * @param config - this plugin row's composition entry config.
+ * @param config - this plugin row's live config.
  */
-export function apply(ctx: Context, config: Config): void {
-  let current = (): Config => config
-  ctx.inject(['settings'], (sctx) => {
-    sctx.settings.installSection(ctx, SEARXNG_SETTINGS_NAMESPACE, Config, config, {
-      setSource: (source) => {
-        current = source
-      },
-      // Nothing is memoized from the section: every operation projects it fresh,
-      // so there is no derived state to re-judge on a change.
-      onChange: () => {},
-    })
-  })
+export function apply(ctx: Context, config: LiveConfig): void {
+  const current = (): Config => snapshotConfig(config)
 
   ctx.web.registerSearchProvider(new SearxngSearchProvider(() => resolveOptions(current())))
 
   ctx.inject(['typert'], (tctx) => {
-    tctx.plugin(SearxngConfigGateway, () => current())
+    tctx.plugin(SearxngConfigGateway, current)
     tctx.typert.register(searxngTypertContribution())
   })
 }

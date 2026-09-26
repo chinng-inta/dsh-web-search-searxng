@@ -74,23 +74,36 @@ or rate-limit aggressively. Run your own.
 
 ## Configuration
 
-The plugin owns the `web-search-searxng` settings namespace, so its section resolves in the harness's
-own layering:
+The configuration is this plugin row's `config`. `baseURL` additionally falls back to `$SEARXNG_URL`
+when the row does not set it, so nothing else is needed to get started: export the variable and the
+provider is configured.
 
+Every key is declared `volatile`, which since dsh 0.1.7-rc.2 means two things: the harness settings
+service may edit it, and an edit updates the running plugin **in place** (no restart). The provider
+reads the row per search, so an edit reaches the next search, and clearing `baseURL` falls back to the
+environment again rather than stranding the provider on a value it can no longer see. Registration
+itself never moves, so provider selection does not flicker when configuration changes.
+
+There are two ways to set it:
+
+- **The Plugins page.** Open this package, then the configure control on its `web-search-searxng`
+  row. The page edits the instance URL and the search language, and saves into the active profile's
+  patch (`$DSH_HOME/profiles/<profile>/cordis.patch.yml`).
+- **A patch row**, in your profile patch or a `--patch` overlay:
+
+```yaml
+- id: web-search-searxng
+  config:
+    baseURL: http://searxng.internal:8888
+    language: ja
+    categories:
+      - general
+      - news
 ```
-schema defaults  →  the plugin row's `config` (composition base)  →  the user layer in the settings document
-```
 
-`baseURL` additionally falls back to `$SEARXNG_URL` when no layer sets it. Nothing else is needed to
-get started: export the variable and the provider is configured.
-
-The section is projected **per search**, so an edit to the settings document reaches the next search
-without a restart — and clearing `baseURL` falls back to the environment again rather than stranding
-the provider on a value it can no longer see. Registration itself never moves, so provider selection
-does not flicker when configuration changes.
-
-A deployment without a settings provider mounted keeps working: the source falls back to the
-composition entry, exactly as composed.
+A patch row replaces the targeted row's **whole** `config`, so restate every key you want. And a row
+you set in a `--patch` overlay sits above the profile patch the Plugins page writes to: a save there
+still changes the running value, but it is not persisted, and the overlay wins again at the next boot.
 
 All keys are optional.
 
@@ -106,27 +119,10 @@ All keys are optional.
 | `maxSnippetChars` | `500` | Per-source snippet cap. |
 | `headers` | none | Extra request headers, e.g. for an instance behind an authenticating proxy. |
 
-As the plugin row's composition base:
-
-```yaml
-- id: web-search-searxng
-  name: 'dsh-web-search-searxng'
-  config:
-    baseURL: http://searxng.internal:8888
-    language: ja
-    categories:
-      - general
-      - news
-```
-
-…or as the user layer in the harness settings document (`$DSH_HOME/settings.yaml` by default),
-which wins over the row above and is what a configuration surface writes:
-
-```yaml
-web-search-searxng:
-  language: ja
-  maxSnippetChars: 300
-```
+Upgrading from `0.4.x`: the `web-search-searxng:` section of `$DSH_HOME/settings.yaml` is no longer
+read — dsh 0.1.7 removed that document. dsh imports it once into the profile patch of the first
+profile that boots (and renames the file to `settings.yaml.imported`); check the result landed where
+you expect.
 
 Every search-shaping knob is a **deployment setting, not a model argument**. The seam's
 `WebSearchRequest` is deliberately just `query` + `maxResults`; provider-neutral controls (recency,
@@ -202,7 +198,8 @@ search, and following one would send the query to a host the deployment never co
 
 | This package | DeepSeek Harness |
 |---|---|
-| `0.4.0`+ | `0.1.2-rc.1` |
+| `0.5.0`+ | `0.1.7-rc.2` |
+| `0.4.0` | `0.1.2-rc.1` – `0.1.5-rc.3` |
 | `0.3.3` – `0.3.x` | `0.1.0-rc.8` – `0.1.1-rc.2` |
 | `0.1.x` – `0.3.2` | `0.1.0-rc.6` |
 
@@ -226,6 +223,12 @@ invalid slot registration ([#1](https://github.com/chinng-inta/dsh-web-search-se
   `@deepseek-ai/dsh-settings`. `0.4.0` uses a bare namespace literal and calls
   `settings.installSection` inside `ctx.inject(['settings'], …)`, which is now the attach/detach
   lifecycle.
+- 0.1.7-rc.2 removed the shared `settings.yaml` together with `settings.installSection`: settings
+  became each plugin row's own `config`, editable where the schema marks a field `volatile` and
+  delivered to `apply` as live references. `0.5.0` marks every key volatile and reads them per search;
+  `0.4.0`'s host half calls the removed method, so its settings never attach. The same release deleted the settings page's
+  `settings.plugin.item` slot; `0.5.0` registers on the Plugins page's `plugins.row.config`
+  (keyed `dsh-web-search-searxng#web-search-searxng`) instead.
 
 `0.3.0` shipped the settings card without its stylesheet — it works, but renders with browser
 defaults. Use `0.3.1` or later.

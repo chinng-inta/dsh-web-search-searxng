@@ -1,10 +1,9 @@
 /**
- * The `web-search-searxng` card on the settings "plugin configuration" page.
+ * The `web-search-searxng` configure page on the Plugins page.
  *
- * The upstream client face exports no reusable card component, so the chrome is
- * self-drawn the way `dsh-llm-fallbacks` draws it: a collapsible `<li>` whose
- * header stacks the plugin name over its description and carries an "unsaved"
- * pill, then the form, then Discard / Reset / Save.
+ * The owner (`plugins.row.config`) draws the chrome (crumb, title, row id,
+ * module name) and asks for two views: a `summary` one-liner for the row, and
+ * a `page` body, which here is the form followed by Discard / Reset / Save.
  *
  * Only the two settings a person actually retunes are here — the instance URL
  * and the search language. Everything else the schema carries (engines,
@@ -14,9 +13,9 @@
  *
  * @module dsh-web-search-searxng/client/SearxngCard
  */
-import { useEffect, useState } from 'react'
+import { useEffect } from 'react'
 import type { ReactNode } from 'react'
-import { Button, Input, Pill } from '@deepseek-ai/dsh-client-ui-primitives'
+import { Button, Input } from '@deepseek-ai/dsh-client-ui-primitives'
 import { LANGUAGE_CHOICES, isDirty, isValidBaseURL } from './searxng-store.js'
 import type { SearxngCardState, SearxngSettingsController } from './searxng-store.js'
 
@@ -31,19 +30,33 @@ export interface SearxngCardInjected {
   useSearxngCard: <T>(select: (snapshot: SearxngCardState) => T) => T
 }
 
-/** Props delivered by the slot outlet: the inject face plus the locale seat. */
+/**
+ * Props delivered by the slot outlet: the inject face, the locale seat, and
+ * the view the owner asks for.
+ */
 export type SearxngCardProps = SearxngCardInjected & {
   t: (key: string, params?: Record<string, string>) => string
+  /** `summary`: the row's one-liner. `page`: the configure page's body. */
+  view: 'summary' | 'page'
 }
 
 /**
- * Render the SearXNG settings card.
- * @param props - injected controller/hook and the synthesized `t` seat.
- * @returns the card element.
+ * Render the view the owner asks for.
+ * @param props - injected controller/hook, the `t` seat, and the owner's view.
+ * @returns the element for that view.
  */
-export function SearxngCard({ controller, useSearxngCard, t }: SearxngCardProps): ReactNode {
+export function SearxngCard(props: SearxngCardProps): ReactNode {
+  if (props.view === 'summary') return props.t('description')
+  return <SearxngForm {...props} />
+}
+
+/**
+ * The form itself: instance URL, search language, then Discard / Reset / Save.
+ * @param props - as {@link SearxngCard}.
+ * @returns the form element.
+ */
+function SearxngForm({ controller, useSearxngCard, t }: SearxngCardProps): ReactNode {
   const state = useSearxngCard((snapshot) => snapshot)
-  const [open, setOpen] = useState(false)
 
   useEffect(() => {
     void controller.load()
@@ -55,101 +68,84 @@ export function SearxngCard({ controller, useSearxngCard, t }: SearxngCardProps)
   const canSave = dirty && !busy && state.writable && urlOk
 
   return (
-    <li className="dsw-searxng-card">
-      <button
-        type="button"
-        className="dsw-searxng-card__header"
-        aria-expanded={open}
-        onClick={() => setOpen((value) => !value)}
-      >
-        <span className="dsw-searxng-card__heading">
-          <span className="dsw-searxng-card__title">{t('title')}</span>
-          <span className="dsw-searxng-card__description">{t('description')}</span>
-        </span>
-        {dirty ? <Pill>{t('dirty')}</Pill> : null}
-      </button>
-
-      {open ? (
-        <div className="dsw-searxng-card__body">
-          {state.status === 'loading' ? <p>{t('loading')}</p> : null}
-          {state.status === 'failed' ? (
-            <p role="alert">{t('error', { message: state.error ?? '' })}</p>
-          ) : null}
-          {!state.writable && state.status === 'ready' ? <p>{t('readonly')}</p> : null}
-
-          <label className="dsw-searxng-card__field">
-            <span>{t('baseURL')}</span>
-            <Input
-              type="url"
-              inputMode="url"
-              spellCheck={false}
-              value={state.draft.baseURL}
-              placeholder={t('baseURL.placeholder')}
-              disabled={busy || !state.writable}
-              onChange={(event) => controller.edit('baseURL', event.target.value)}
-            />
-            {/* An empty field is not necessarily unconfigured: the environment
-                may be supplying the URL, and saying "unset" there would lie. */}
-            {state.draft.baseURL.trim() === '' && state.baseURLSource === 'environment' ? (
-              <small>
-                {t('baseURL.fromEnvironment', {
-                  env: state.baseURLEnvVar,
-                  url: state.effectiveBaseURL ?? '',
-                })}
-              </small>
-            ) : null}
-            {state.draft.baseURL.trim() === '' && state.baseURLSource === 'none' ? (
-              <small role="alert">{t('baseURL.unset', { env: state.baseURLEnvVar })}</small>
-            ) : null}
-            {!urlOk ? <small role="alert">{t('baseURL.invalid')}</small> : null}
-          </label>
-
-          <label className="dsw-searxng-card__field">
-            <span>{t('language')}</span>
-            {/* A closed list, not free text: the instance validates a language's
-                SHAPE but not whether the locale exists, so a typo like `jp` is
-                accepted and silently skews results instead of erroring. */}
-            <select
-              value={state.draft.language}
-              disabled={busy || !state.writable}
-              onChange={(event) => controller.edit('language', event.target.value)}
-            >
-              {LANGUAGE_CHOICES.map((choice) => (
-                <option key={choice.value} value={choice.value}>
-                  {'labelKey' in choice ? t(choice.labelKey) : choice.label}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <div className="dsw-searxng-card__footer">
-            <Button
-              variant="ghost"
-              size="sm"
-              disabled={!dirty || busy}
-              onClick={() => controller.discard()}
-            >
-              {t('discard')}
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={busy || !state.writable}
-              onClick={() => void controller.reset()}
-            >
-              {t('reset')}
-            </Button>
-            <Button
-              variant="primary"
-              size="sm"
-              disabled={!canSave}
-              onClick={() => void controller.save()}
-            >
-              {busy ? t('saving') : t('save')}
-            </Button>
-          </div>
-        </div>
+    <div className="dsw-searxng-card__body">
+      {state.status === 'loading' ? <p>{t('loading')}</p> : null}
+      {state.status === 'failed' ? (
+        <p role="alert">{t('error', { message: state.error ?? '' })}</p>
       ) : null}
-    </li>
+      {!state.writable && state.status === 'ready' ? <p>{t('readonly')}</p> : null}
+
+      <label className="dsw-searxng-card__field">
+        <span>{t('baseURL')}</span>
+        <Input
+          type="url"
+          inputMode="url"
+          spellCheck={false}
+          value={state.draft.baseURL}
+          placeholder={t('baseURL.placeholder')}
+          disabled={busy || !state.writable}
+          onChange={(event) => controller.edit('baseURL', event.target.value)}
+        />
+        {/* An empty field is not necessarily unconfigured: the environment
+            may be supplying the URL, and saying "unset" there would lie. */}
+        {state.draft.baseURL.trim() === '' && state.baseURLSource === 'environment' ? (
+          <small>
+            {t('baseURL.fromEnvironment', {
+              env: state.baseURLEnvVar,
+              url: state.effectiveBaseURL ?? '',
+            })}
+          </small>
+        ) : null}
+        {state.draft.baseURL.trim() === '' && state.baseURLSource === 'none' ? (
+          <small role="alert">{t('baseURL.unset', { env: state.baseURLEnvVar })}</small>
+        ) : null}
+        {!urlOk ? <small role="alert">{t('baseURL.invalid')}</small> : null}
+      </label>
+
+      <label className="dsw-searxng-card__field">
+        <span>{t('language')}</span>
+        {/* A closed list, not free text: the instance validates a language's
+            SHAPE but not whether the locale exists, so a typo like `jp` is
+            accepted and silently skews results instead of erroring. */}
+        <select
+          value={state.draft.language}
+          disabled={busy || !state.writable}
+          onChange={(event) => controller.edit('language', event.target.value)}
+        >
+          {LANGUAGE_CHOICES.map((choice) => (
+            <option key={choice.value} value={choice.value}>
+              {'labelKey' in choice ? t(choice.labelKey) : choice.label}
+            </option>
+          ))}
+        </select>
+      </label>
+
+      <div className="dsw-searxng-card__footer">
+        <Button
+          variant="ghost"
+          size="sm"
+          disabled={!dirty || busy}
+          onClick={() => controller.discard()}
+        >
+          {t('discard')}
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          disabled={busy || !state.writable}
+          onClick={() => void controller.reset()}
+        >
+          {t('reset')}
+        </Button>
+        <Button
+          variant="primary"
+          size="sm"
+          disabled={!canSave}
+          onClick={() => void controller.save()}
+        >
+          {busy ? t('saving') : t('save')}
+        </Button>
+      </div>
+    </div>
   )
 }
