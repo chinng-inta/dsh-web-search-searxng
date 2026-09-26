@@ -28,6 +28,7 @@ export const zh = {
   readonly: '当前部署的配置为只读。',
   loading: '加载中…',
   error: '读取配置失败：{message}',
+  saveError: '保存失败：{message}',
 }
 
 /** English dictionary, checked complete against the zh key set. */
@@ -50,4 +51,5 @@ export const en = {
   readonly: 'This deployment serves configuration read-only.',
   loading: 'Loading…',
   error: 'Could not read configuration: {message}',
+  saveError: 'Could not save: {message}',
 }

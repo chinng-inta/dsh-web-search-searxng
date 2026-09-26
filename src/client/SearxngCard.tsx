@@ -73,6 +73,13 @@ function SearxngForm({ controller, useSearxngCard, t }: SearxngCardProps): React
       {state.status === 'failed' ? (
         <p role="alert">{t('error', { message: state.error ?? '' })}</p>
       ) : null}
+      {/* A failed save or reset leaves status 'ready' and the draft in place,
+          so without this the page reads as saved. dsh refuses the write when a
+          --patch overlay also sets this row ("overridden by a home patch or
+          command-line overlay"), which is exactly when it matters. */}
+      {state.status === 'ready' && state.error !== undefined ? (
+        <p role="alert">{t('saveError', { message: state.error })}</p>
+      ) : null}
       {!state.writable && state.status === 'ready' ? <p>{t('readonly')}</p> : null}
 
       <label className="dsw-searxng-card__field">
